@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <style>
+    .title { font: bold 18px sans-serif; }
+    .component { font: 14px sans-serif; }
+    .main { fill: #ff9966; stroke: #333; stroke-width: 2px; }
+    .service { fill: #99ccff; stroke: #333; stroke-width: 1px; }
+    .storage { fill: #ffcc99; stroke: #333; stroke-width: 1px; }
+    .messaging { fill: #cc99ff; stroke: #333; stroke-width: 1px; }
+    .arrow { stroke: #666; stroke-width: 1.5px; fill: none; }
+    .arrowhead { fill: #666; }
+    .label { font: 11px sans-serif; fill: #333; }
+  </style>
+  
+  <!-- Title -->
+  <text x="400" y="30" class="title" text-anchor="middle">Traffic Monitoring System Architecture</text>
+  
+  <!-- Main Application -->
+  <rect x="350" y="60" width="120" height="50" rx="5" class="main" />
+  <text x="410" y="90" class="component" text-anchor="middle">Main Application</text>
+  
+  <!-- Services -->
+  <rect x="150" y="150" width="120" height="50" rx="5" class="service" />
+  <text x="210" y="180" class="component" text-anchor="middle">Video Ingestion</text>
+  
+  <rect x="150" y="250" width="120" height="50" rx="5" class="service" />
+  <text x="210" y="280" class="component" text-anchor="middle">Detection</text>
+  
+  <rect x="150" y="350" width="120" height="50" rx="5" class="service" />
+  <text x="210" y="380" class="component" text-anchor="middle">Tracking</text>
+  
+  <rect x="150" y="450" width="120" height="50" rx="5" class="service" />
+  <text x="210" y="480" class="component" text-anchor="middle">Counting</text>
+  
+  <rect x="550" y="350" width="120" height="50" rx="5" class="service" />
+  <text x="610" y="380" class="component" text-anchor="middle">OCR</text>
+  
+  <!-- Storage -->
+  <rect x="550" y="450" width="120" height="50" rx="5" class="storage" />
+  <text x="610" y="480" class="component" text-anchor="middle">Storage</text>
+  
+  <ellipse cx="610" cy="550" rx="50" ry="30" class="storage" />
+  <text x="610" y="555" class="component" text-anchor="middle">Database</text>
+  
+  <!-- MQTT -->
+  <polygon points="350,300 400,270 450,300 400,330" class="messaging" />
+  <text x="400" y="305" class="component" text-anchor="middle">MQTT</text>
+  
+  <!-- Connections from Main to Services -->
+  <path d="M370,110 L230,150" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M390,110 L230,250" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M410,110 L230,350" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M430,110 L230,450" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M450,110 L580,350" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M470,110 L580,450" class="arrow" marker-end="url(#arrowhead)" />
+  
+  <!-- Service pipeline -->
+  <path d="M210,200 L210,250" class="arrow" marker-end="url(#arrowhead)" />
+  <text x="220" y="225" class="label">Frame data</text>
+  
+  <path d="M210,300 L210,350" class="arrow" marker-end="url(#arrowhead)" />
+  <text x="220" y="325" class="label">Detection results</text>
+  
+  <path d="M210,400 L210,450" class="arrow" marker-end="url(#arrowhead)" />
+  <text x="220" y="425" class="label">Tracking results</text>
+  
+  <path d="M270,370 L550,370" class="arrow" marker-end="url(#arrowhead)" />
+  <text x="410" y="355" class="label">Tracking & Detection results</text>
+  
+  <!-- MQTT connections -->
+  <path d="M270,270 L350,290" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M270,370 L350,310" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M270,470 L350,330" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M550,370 L450,310" class="arrow" marker-end="url(#arrowhead)" />
+  <path d="M450,330 L550,460" class="arrow" marker-end="url(#arrowhead)" />
+  
+  <!-- Storage to DB -->
+  <path d="M610,500 L610,520" class="arrow" marker-end="url(#arrowhead)" />
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" class="arrowhead" />
+    </marker>
+  </defs>
+</svg>

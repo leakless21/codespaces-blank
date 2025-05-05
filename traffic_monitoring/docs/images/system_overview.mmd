@@ -1,0 +1,44 @@
+graph LR
+    title[<b>Traffic Monitoring System Overview</b>]
+    
+    %% Input section
+    subgraph Input
+        Camera[Camera/Video Feed]
+        Video[Video Ingestion]
+    end
+    
+    %% Processing pipeline
+    subgraph Processing
+        Detection[Vehicle & Plate Detection]
+        Tracking[Multi-Object Tracking]
+        Counting[Vehicle Counting]
+        OCR[License Plate OCR]
+    end
+    
+    %% Output section
+    subgraph Output
+        UI[Visualization UI]
+        Data[Data Storage]
+        API[REST API]
+    end
+    
+    %% Flow
+    Camera --> Video
+    Video --> Detection
+    Detection --> Tracking
+    Tracking --> Counting
+    Tracking --> OCR
+    Counting --> UI
+    OCR --> UI
+    Counting --> Data
+    OCR --> Data
+    Data --> API
+    
+    %% Styling
+    classDef input fill:#bfb,stroke:#333,stroke-width:1px
+    classDef process fill:#9cf,stroke:#333,stroke-width:1px
+    classDef output fill:#fbf,stroke:#333,stroke-width:1px
+    
+    class Camera,Video input
+    class Detection,Tracking,Counting,OCR process
+    class UI,Data,API output

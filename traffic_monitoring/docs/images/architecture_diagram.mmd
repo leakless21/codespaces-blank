@@ -1,0 +1,48 @@
+graph TD
+    title[<b>Traffic Monitoring System Architecture</b>]
+    
+    %% Main components
+    Main[Main Application]
+    Video[Video Ingestion Service]
+    Detection[Detection Service]
+    Tracking[Tracking Service]
+    Counting[Counting Service]
+    OCR[OCR Service]
+    Storage[Storage Service]
+    DB[(Database)]
+    MQTT{MQTT Broker}
+    
+    %% Flow between components
+    Video -->|Frame data| Detection
+    Detection -->|Detection results| Tracking
+    Tracking -->|Tracking results| Counting
+    Tracking -->|Tracking & Detection results| OCR
+    
+    %% MQTT messaging
+    Detection -->|Publishes detections| MQTT
+    Tracking -->|Publishes tracks| MQTT
+    Counting -->|Publishes counts| MQTT
+    OCR -->|Publishes plate readings| MQTT
+    MQTT -->|Subscribes to all topics| Storage
+    
+    %% Database storage
+    Storage -->|Stores data| DB
+    
+    %% Main application orchestration
+    Main -->|Initializes & coordinates| Video
+    Main -->|Initializes & coordinates| Detection
+    Main -->|Initializes & coordinates| Tracking
+    Main -->|Initializes & coordinates| Counting
+    Main -->|Initializes & coordinates| OCR
+    Main -->|Initializes & coordinates| Storage
+    
+    %% Styling
+    classDef main fill:#f96,stroke:#333,stroke-width:2px
+    classDef service fill:#9cf,stroke:#333,stroke-width:1px
+    classDef storage fill:#fc9,stroke:#333,stroke-width:1px
+    classDef messaging fill:#c9f,stroke:#333,stroke-width:1px
+    
+    class Main main
+    class Video,Detection,Tracking,Counting,OCR service
+    class Storage,DB storage
+    class MQTT messaging
