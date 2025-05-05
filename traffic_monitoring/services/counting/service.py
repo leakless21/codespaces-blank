@@ -16,15 +16,18 @@ class CountingService:
     """
     Service for counting vehicles crossing a line
     """
-    def __init__(self, counting_line=None):
+    def __init__(self, counting_line=None, use_raw_coordinates=False):
         """
         Initialize the counting service
         
         Args:
             counting_line (list): List of two points defining the counting line
-                [[x1, y1], [x2, y2]] in normalized coordinates (0-1)
+                [[x1, y1], [x2, y2]] in normalized coordinates (0-1) or raw pixel coordinates
+            use_raw_coordinates (bool): If True, counting_line contains raw pixel coordinates
+                instead of normalized coordinates
         """
         self.counting_line = counting_line or config.COUNTING_LINE
+        self.use_raw_coordinates = use_raw_coordinates or getattr(config, 'USE_RAW_COORDINATES', False)
         self.counted_tracks = {}  # {track_id: {'direction': 1, 'timestamp': ts}}
         self.counts = {'up': 0, 'down': 0, 'total': 0}
         self.reset_time = time.time()
@@ -62,11 +65,18 @@ class CountingService:
         # Get frame dimensions to convert normalized line coordinates to pixels
         height, width = frame.shape[:2]
         
-        # Convert normalized line coordinates to pixels
-        line = [
-            [int(self.counting_line[0][0] * width), int(self.counting_line[0][1] * height)],
-            [int(self.counting_line[1][0] * width), int(self.counting_line[1][1] * height)]
-        ]
+        # Convert normalized line coordinates to pixels or use raw coordinates
+        if not self.use_raw_coordinates:
+            line = [
+                [int(self.counting_line[0][0] * width), int(self.counting_line[0][1] * height)],
+                [int(self.counting_line[1][0] * width), int(self.counting_line[1][1] * height)]
+            ]
+        else:
+            # Use raw coordinates directly
+            line = [
+                [int(self.counting_line[0][0]), int(self.counting_line[0][1])],
+                [int(self.counting_line[1][0]), int(self.counting_line[1][1])]
+            ]
         
         # Store new counts for this frame
         new_counts = []
@@ -236,6 +246,14 @@ if __name__ == "__main__":
     video_service = VideoIngestionService()
     detection_service = DetectionService()
     tracking_service = TrackingService()
+    
+    # Example of using raw coordinates for the counting line
+    # counting_service = CountingService(
+    #     counting_line=[[320, 360], [960, 360]], 
+    #     use_raw_coordinates=True
+    # )
+    
+    # Using default configuration (can be either raw or normalized based on config)
     counting_service = CountingService()
     
     # Start video service

@@ -1,48 +1,63 @@
-graph TD
+flowchart LR
     title[<b>Traffic Monitoring System Architecture</b>]
     
-    %% Main components
-    Main[Main Application]
-    Video[Video Ingestion Service]
-    Detection[Detection Service]
-    Tracking[Tracking Service]
-    Counting[Counting Service]
-    OCR[OCR Service]
-    Storage[Storage Service]
-    DB[(Database)]
-    MQTT{MQTT Broker}
+    %% Main components with improved node shapes
+    Camera((Camera Input))
     
-    %% Flow between components
-    Video -->|Frame data| Detection
-    Detection -->|Detection results| Tracking
-    Tracking -->|Tracking results| Counting
-    Tracking -->|Tracking & Detection results| OCR
+    subgraph Processing["Processing Pipeline"]
+        direction TB
+        Video[/"Video Ingestion Service"\]
+        Detection[["Object Detection Service"]]
+        Tracking[["Object Tracking Service"]]
+        Counting[["Vehicle Counting Service"]]
+        OCR[["License Plate OCR Service"]]
+    end
     
-    %% MQTT messaging
-    Detection -->|Publishes detections| MQTT
-    Tracking -->|Publishes tracks| MQTT
-    Counting -->|Publishes counts| MQTT
-    OCR -->|Publishes plate readings| MQTT
-    MQTT -->|Subscribes to all topics| Storage
+    subgraph DataFlow["Data Management"]
+        direction TB
+        MQTT{{MQTT Broker}}
+        Storage[("Storage Service")]
+        DB[(Database)]
+        API>"REST API"]
+    end
     
-    %% Database storage
-    Storage -->|Stores data| DB
+    subgraph UI["User Interface"]
+        direction TB
+        Dashboard["Dashboard Visualization"]
+        Reports["Reports & Analytics"]
+    end
     
-    %% Main application orchestration
-    Main -->|Initializes & coordinates| Video
-    Main -->|Initializes & coordinates| Detection
-    Main -->|Initializes & coordinates| Tracking
-    Main -->|Initializes & coordinates| Counting
-    Main -->|Initializes & coordinates| OCR
-    Main -->|Initializes & coordinates| Storage
+    %% Flow between components with better arrow styling
+    Camera ==> Video
+    Video ==> Detection
+    Detection ==> Tracking
+    Tracking ==> Counting
+    Tracking ==> OCR
+    
+    %% MQTT messaging with clear indication of published messages
+    Detection -.->|"Publish detections"| MQTT
+    Tracking -.->|"Publish tracks"| MQTT
+    Counting -.->|"Publish counts"| MQTT
+    OCR -.->|"Publish plate data"| MQTT
+    
+    %% Data storage flow
+    MQTT -.->|"Subscribe to topics"| Storage
+    Storage ==>|"Store data"| DB
+    DB ==>|"Query data"| API
+    
+    %% Output visualization
+    API ==> Dashboard
+    API ==> Reports
     
     %% Styling
-    classDef main fill:#f96,stroke:#333,stroke-width:2px
-    classDef service fill:#9cf,stroke:#333,stroke-width:1px
-    classDef storage fill:#fc9,stroke:#333,stroke-width:1px
-    classDef messaging fill:#c9f,stroke:#333,stroke-width:1px
+    classDef input fill:#b9fbc0,stroke:#333,stroke-width:1px
+    classDef process fill:#90dbf4,stroke:#333,stroke-width:1px
+    classDef messaging fill:#fbf8cc,stroke:#333,stroke-width:1px
+    classDef storage fill:#98f5e1,stroke:#333,stroke-width:1px
+    classDef ui fill:#f1c0e8,stroke:#333,stroke-width:1px
     
-    class Main main
-    class Video,Detection,Tracking,Counting,OCR service
-    class Storage,DB storage
+    class Camera input
+    class Video,Detection,Tracking,Counting,OCR process
     class MQTT messaging
+    class Storage,DB,API storage
+    class Dashboard,Reports ui

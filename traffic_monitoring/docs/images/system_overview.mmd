@@ -1,44 +1,68 @@
-graph LR
+flowchart LR
     title[<b>Traffic Monitoring System Overview</b>]
     
-    %% Input section
-    subgraph Input
-        Camera[Camera/Video Feed]
-        Video[Video Ingestion]
+    %% Use clearer subgraphs with descriptive titles
+    subgraph InputSources["Video Sources"]
+        direction TB
+        Camera(("Traffic Camera"))
+        VideoFile["Recorded Video File"]
     end
     
-    %% Processing pipeline
-    subgraph Processing
-        Detection[Vehicle & Plate Detection]
-        Tracking[Multi-Object Tracking]
-        Counting[Vehicle Counting]
-        OCR[License Plate OCR]
+    subgraph CorePipeline["Core Processing Pipeline"]
+        direction TB
+        VideoIngestion[/"Video Ingestion"/]
+        
+        subgraph Analysis["Video Analysis"]
+            direction TB
+            Detection[["Vehicle & Plate Detection"]]
+            Tracking[["Multi-Object Tracking"]]
+            Counting[["Traffic Statistics"]]
+            OCR[["License Plate Recognition"]]
+        end
     end
     
-    %% Output section
-    subgraph Output
-        UI[Visualization UI]
-        Data[Data Storage]
-        API[REST API]
+    subgraph Results["Results & Outputs"]
+        direction TB
+        subgraph Visualization["Visualization"]
+            LiveDashboard["Live Dashboard"]
+            HistoricalData["Historical Reports"]
+        end
+        
+        subgraph Integration["Data Integration"]
+            Database[(Database)]
+            API>"REST API"]
+            Export["Data Export"]
+        end
     end
     
-    %% Flow
-    Camera --> Video
-    Video --> Detection
-    Detection --> Tracking
-    Tracking --> Counting
-    Tracking --> OCR
-    Counting --> UI
-    OCR --> UI
-    Counting --> Data
-    OCR --> Data
-    Data --> API
+    %% Flow with clearer paths and better labels
+    InputSources ==> VideoIngestion
+    VideoIngestion ==> Detection
+    Detection ==> Tracking
+    Tracking ==> Counting
+    Tracking ==> OCR
     
-    %% Styling
-    classDef input fill:#bfb,stroke:#333,stroke-width:1px
-    classDef process fill:#9cf,stroke:#333,stroke-width:1px
-    classDef output fill:#fbf,stroke:#333,stroke-width:1px
+    Counting -.-> LiveDashboard
+    OCR -.-> LiveDashboard
     
-    class Camera,Video input
-    class Detection,Tracking,Counting,OCR process
-    class UI,Data,API output
+    Counting ==> Database
+    OCR ==> Database
+    
+    Database ==> HistoricalData
+    Database ==> API
+    API ==> Export
+    
+    %% Styling with a more intuitive color scheme
+    classDef input fill:#d8f3dc,stroke:#333,stroke-width:2px
+    classDef ingestion fill:#95d5b2,stroke:#333,stroke-width:2px
+    classDef analysis fill:#74c69d,stroke:#333,stroke-width:2px
+    classDef visualization fill:#52b788,stroke:#333,stroke-width:2px
+    classDef database fill:#40916c,stroke:#333,stroke-width:2px,color:#fff
+    classDef api fill:#2d6a4f,stroke:#333,stroke-width:2px,color:#fff
+    
+    class Camera,VideoFile input
+    class VideoIngestion ingestion
+    class Detection,Tracking,Counting,OCR analysis
+    class LiveDashboard,HistoricalData visualization
+    class Database,Export database
+    class API api

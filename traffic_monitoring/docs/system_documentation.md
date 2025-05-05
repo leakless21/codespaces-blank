@@ -127,18 +127,25 @@ tracking_results = tracking_service.update(frame_data, detection_results)
 **Purpose**: Count vehicles crossing a user-defined line.
 
 **Key Features**:
-- Configurable counting line placement
+- Configurable counting line placement with support for both normalized and raw pixel coordinates
 - Directional counting (up/down or left/right)
 - Per-track counting to avoid duplicate counts
 - Reset functionality for count statistics
 
 **Configuration Parameters**:
-- `COUNTING_LINE`: Two points defining the counting line in normalized coordinates
+- `USE_RAW_COORDINATES`: Boolean flag to use raw pixel coordinates instead of normalized coordinates
+- `COUNTING_LINE`: Two points defining the counting line, either in normalized coordinates (0-1) or raw pixel coordinates
 
 **Usage Example**:
 ```python
+# Using default configuration (either normalized or raw based on config)
 counting_service = CountingService()
-counting_results = counting_service.update(frame_data, tracking_results)
+
+# Using raw pixel coordinates directly in code
+counting_service = CountingService(
+    counting_line=[[320, 360], [960, 360]],
+    use_raw_coordinates=True
+)
 ```
 
 **Modification Guide**:
@@ -242,8 +249,13 @@ OCR_LANGUAGES=en
 OCR_GPU=False
 
 # Counting settings
+USE_RAW_COORDINATES=False
+# For normalized coordinates (USE_RAW_COORDINATES=False):
 COUNTING_LINE_START=0.25,0.6
 COUNTING_LINE_END=0.75,0.6
+# For raw pixel coordinates (USE_RAW_COORDINATES=True):
+# COUNTING_LINE_START=320,360
+# COUNTING_LINE_END=960,360
 
 # Video settings
 VIDEO_SOURCE=0

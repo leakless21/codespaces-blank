@@ -16,7 +16,7 @@ class ONNXDetector:
     """
     ONNX-based object detector for vehicles and license plates
     """
-    def __init__(self, model_path=None, confidence_threshold=None, iou_threshold=None):
+    def __init__(self, model_path=None, confidence_threshold=None, iou_threshold=None, enabled_classes=None):
         """
         Initialize the ONNX detector
         
@@ -24,10 +24,12 @@ class ONNXDetector:
             model_path (str): Path to the ONNX model
             confidence_threshold (float): Confidence threshold for detections
             iou_threshold (float): IoU threshold for non-maximum suppression
+            enabled_classes (list): List of class IDs to detect, None for all classes
         """
         self.model_path = model_path or config.VEHICLE_DETECTION_MODEL
         self.confidence_threshold = confidence_threshold or config.DETECTION_CONFIDENCE
         self.iou_threshold = iou_threshold or config.DETECTION_IOU_THRESHOLD
+        self.enabled_classes = enabled_classes
         
         # Check if model file exists
         if not Path(self.model_path).exists():
@@ -47,6 +49,8 @@ class ONNXDetector:
         self.input_height = self.input_shape[3]
         
         print(f"Model loaded: input shape={self.input_shape}")
+        if self.enabled_classes:
+            print(f"Detecting only class IDs: {self.enabled_classes}")
     
     def preprocess(self, image):
         """
@@ -125,6 +129,9 @@ class ONNXDetector:
             confidence = scores[class_id] * detection[4]  # obj_conf * cls_conf
             
             if confidence > self.confidence_threshold:
+                if self.enabled_classes and class_id not in self.enabled_classes:
+                    continue
+                
                 # Get bounding box coordinates
                 x, y, w, h = detection[0:4]
                 
@@ -171,11 +178,12 @@ class DetectionService:
             vehicle_model_path (str): Path to the vehicle detection model
             plate_model_path (str): Path to the license plate detection model
         """
-        # Initialize vehicle detector
+        # Initialize vehicle detector with enabled classes from config
         self.vehicle_detector = ONNXDetector(
             model_path=vehicle_model_path or config.VEHICLE_DETECTION_MODEL,
             confidence_threshold=config.DETECTION_CONFIDENCE,
-            iou_threshold=config.DETECTION_IOU_THRESHOLD
+            iou_threshold=config.DETECTION_IOU_THRESHOLD,
+            enabled_classes=config.ENABLED_VEHICLE_CLASSES
         )
         
         # Initialize plate detector
@@ -184,6 +192,9 @@ class DetectionService:
             confidence_threshold=config.DETECTION_CONFIDENCE,
             iou_threshold=config.DETECTION_IOU_THRESHOLD
         )
+        
+        # Store class names for visualization
+        self.vehicle_class_names = config.VEHICLE_CLASS_NAMES
         
         # Initialize MQTT client
         self.client = mqtt.Client()

@@ -1,0 +1,52 @@
+# Traffic Monitoring System Configuration
+
+# Detection settings
+detection:
+  confidence: 0.25
+  iou_threshold: 0.45
+  # Vehicle class settings
+  vehicle_classes:
+    # Standard COCO class IDs for vehicles
+    # 0:person, 1:bicycle, 2:car, 3:motorcycle, 5:bus, 7:truck
+    enabled_classes: [0, 1, 2, 3, 5, 7]  # Default: all vehicle classes
+    class_names:
+      0: "person"
+      1: "bicycle"
+      2: "car"
+      3: "motorcycle" 
+      5: "bus"
+      7: "truck"
+    # Count specific classes only (empty means count all enabled classes)
+    count_classes: []
+
+# Tracking settings
+tracking:
+  tracker_type: bytetrack
+  confidence: 0.3
+
+# OCR settings
+ocr:
+  languages: [en]
+  use_gpu: false
+
+# Counting settings
+counting:
+  # Counting line coordinates
+  # If use_raw_coordinates is false, values should be between 0-1 (normalized)
+  # If use_raw_coordinates is true, values should be pixel coordinates
+  raw_coordinates:
+    start: [320, 360]
+    end: [960, 360]
+  normalized_coordinates:
+    start: [0.25, 0.6]
+    end: [0.75, 0.6]
+
+# Video processing settings
+video:
+  frame_skip: 1
+  output_fps: 20
+  process_resolution: [640, 640]
+
+# MQTT settings
+mqtt:
+  topic_prefix: traffic_monitoring
