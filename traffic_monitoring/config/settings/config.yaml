@@ -40,9 +40,10 @@ counting:
   # Counting line coordinates
   # If use_raw_coordinates is false, values should be between 0-1 (normalized)
   # If use_raw_coordinates is true, values should be pixel coordinates
+  #[344, 651], [1912, 673]
   raw_coordinates:
-    start: [320, 360]
-    end: [960, 360]
+    start: [344, 651]
+    end: [1912, 673]
   normalized_coordinates:
     start: [0.25, 0.6]
     end: [0.75, 0.6]
