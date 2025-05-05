@@ -1,15 +1,26 @@
+# Core dependencies for computer vision and AI
 numpy>=1.20.0
 opencv-python>=4.6.0
 onnx>=1.12.0
 onnxruntime>=1.13.1
-ultralytics>=8.0.0
-boxmot>=10.0.33
-easyocr>=1.7.0
-paho-mqtt
+ultralytics>=8.0.0  # YOLO object detection
+boxmot>=10.0.33     # Object tracking
+easyocr>=1.7.0      # Optical character recognition
+
+# Communication
+paho-mqtt          # MQTT client for IoT communication
+
+# API and web server
 fastapi>=0.95.0
 uvicorn>=0.22.0
 pydantic>=1.10.7
 python-multipart>=0.0.6
+
+# Database and storage
 SQLAlchemy>=2.0.0
+
+# Configuration
 python-dotenv>=1.0.0
+
+# Testing
 pytest>=7.3.1
