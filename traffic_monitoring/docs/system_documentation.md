@@ -279,10 +279,17 @@ The following command-line arguments are available:
 - `--source`: Video source (file path, RTSP URL, or device ID)
 - `--no-ui`: Disable UI display
 - `--record`: Record output video
+- `--output`: Specify the output video file path
+- `--render-video`: Only render output video without live display (batch processing mode)
 
 Example:
 ```bash
 python main.py --source rtsp://example.com/stream --record
+```
+
+To render a video without displaying UI (useful for batch processing or headless servers):
+```bash
+python main.py --source /path/to/input.mp4 --render-video --output /path/to/output.mp4
 ```
 
 ## 5. Performance Optimization

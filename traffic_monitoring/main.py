@@ -22,7 +22,7 @@ class TrafficMonitoringApp:
     """
     Main application for traffic monitoring
     """
-    def __init__(self, video_source=None, show_ui=True, record_output=False):
+    def __init__(self, video_source=None, show_ui=True, record_output=False, output_path=None, render_video_only=False):
         """
         Initialize the traffic monitoring application
         
@@ -30,10 +30,14 @@ class TrafficMonitoringApp:
             video_source (str): Path to video file, RTSP URL, or device ID
             show_ui (bool): Whether to show the user interface
             record_output (bool): Whether to record the output video
+            output_path (str): Path to save the output video (if None, a default path will be used)
+            render_video_only (bool): Whether to only render a video without live display
         """
         self.video_source = video_source or config.VIDEO_SOURCE
-        self.show_ui = show_ui
-        self.record_output = record_output
+        self.show_ui = show_ui and not render_video_only  # Disable UI if render_video_only is True
+        self.record_output = record_output or render_video_only  # Always record if render_video_only is True
+        self.output_path = output_path
+        self.render_video_only = render_video_only
         self.running = False
         
         # Initialize services
@@ -107,12 +111,17 @@ class TrafficMonitoringApp:
         height, width = frame.shape[:2]
         
         # Create output directory if it doesn't exist
-        output_dir = Path(config.DATA_DIR) / "recordings"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create output file name based on current time
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        output_path = str(output_dir / f"traffic_monitoring_{timestamp}.mp4")
+        if self.output_path:
+            output_path = self.output_path
+            # Ensure the parent directory exists
+            os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        else:
+            output_dir = Path(config.DATA_DIR) / "recordings"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create output file name based on current time
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            output_path = str(output_dir / f"traffic_monitoring_{timestamp}.mp4")
         
         # Create video writer
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -120,15 +129,28 @@ class TrafficMonitoringApp:
             output_path, fourcc, config.OUTPUT_FPS, (width, height))
         
         print(f"Recording output to {output_path}")
+        
+        # Return frame to pipeline
+        self.video_service.rewind_one_frame()
     
     def _process_frames(self):
         """Process frames from the video service"""
         try:
             frame_count = 0
+            total_frames = self.video_service.get_total_frames()
+            
+            # For render-only mode, show a progress bar
+            if self.render_video_only and total_frames > 0:
+                print(f"Rendering video: 0/{total_frames} frames (0%)")
+            
             while self.running:
                 # Get frame from video service
                 frame_data = self.video_service.get_frame()
                 if frame_data is None:
+                    if self.render_video_only:
+                        print("Finished processing all frames")
+                        self.running = False
+                        break
                     time.sleep(0.01)  # Short sleep if no frame available
                     continue
                 
@@ -166,6 +188,11 @@ class TrafficMonitoringApp:
                                                           ocr_results, fps)
                     self.video_writer.write(vis_frame)
                 
+                # Show progress for render-only mode
+                if self.render_video_only and total_frames > 0 and frame_count % 10 == 0:
+                    progress = (frame_count / total_frames) * 100
+                    print(f"\rRendering video: {frame_count}/{total_frames} frames ({progress:.1f}%)", end="")
+                
                 # Check for key press
                 if self.show_ui:
                     key = cv2.waitKey(1) & 0xFF
@@ -185,6 +212,8 @@ class TrafficMonitoringApp:
         except Exception as e:
             print(f"Error in processing loop: {e}")
         finally:
+            if self.render_video_only and total_frames > 0:
+                print(f"\nRendered {frame_count}/{total_frames} frames")
             self.stop()
     
     def _prepare_visualization(self, frame_data, detection_results, tracking_results, 
@@ -286,6 +315,9 @@ def main():
     parser.add_argument('--source', help='Video source (file path, RTSP URL, or device ID)')
     parser.add_argument('--no-ui', action='store_true', help='Disable UI')
     parser.add_argument('--record', action='store_true', help='Record output video')
+    parser.add_argument('--output', help='Output video file path')
+    parser.add_argument('--render-video', action='store_true', 
+                        help='Only render output video without live display')
     
     args = parser.parse_args()
     
@@ -293,7 +325,9 @@ def main():
     app = TrafficMonitoringApp(
         video_source=args.source,
         show_ui=not args.no_ui,
-        record_output=args.record
+        record_output=args.record,
+        output_path=args.output,
+        render_video_only=args.render_video
     )
     
     # Start application

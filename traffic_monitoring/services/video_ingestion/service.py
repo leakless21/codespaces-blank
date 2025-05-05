@@ -34,6 +34,7 @@ class VideoIngestionService:
         self.capture = None
         self.capture_thread = None
         self.frame_count = 0
+        self.last_position = 0  # Track the last frame position
         
         # Initialize MQTT client
         self.client = mqtt.Client()
@@ -97,9 +98,64 @@ class VideoIngestionService:
             self.client.disconnect()
         print("Video ingestion service stopped")
     
+    def get_total_frames(self):
+        """
+        Get the total number of frames in the video source
+        
+        Returns:
+            int: Total frames or 0 if unavailable (e.g., for livestreams/webcams)
+        """
+        if self.capture is None:
+            return 0
+            
+        # This only works for video files, not for cameras/streams
+        total = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        # Return 0 for live sources (webcams, RTSP streams)
+        if total <= 0 or isinstance(self.source, int) or (
+                isinstance(self.source, str) and 
+                (self.source.startswith('rtsp://') or 
+                 self.source.startswith('http://') or 
+                 self.source.startswith('https://'))):
+            return 0
+        
+        return total
+    
+    def rewind_one_frame(self):
+        """
+        Rewind the video by one frame
+        
+        This is useful when we need to re-read the first frame,
+        for example after initialization.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if self.capture is None:
+            return False
+            
+        # Only attempt to rewind for file sources, not cameras
+        if isinstance(self.source, str) and Path(self.source).exists():
+            current_pos = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
+            
+            # Store for rewind if this is first frame
+            if current_pos <= 1:
+                self.last_position = 0
+            else:
+                self.last_position = current_pos - 1
+                
+            self.capture.set(cv2.CAP_PROP_POS_FRAMES, self.last_position)
+            return True
+        
+        return False
+
     def _capture_frames(self):
         """Thread function for capturing frames"""
         while self.is_running:
+            # Save the current position before reading for rewind capability
+            if isinstance(self.source, str) and Path(self.source).exists():
+                self.last_position = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
+                
             ret, frame = self.capture.read()
             if not ret:
                 # If video file ends, loop back to beginning

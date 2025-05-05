@@ -79,11 +79,23 @@ To use your webcam as the video source:
 python main.py --source 0
 ```
 
+To process a video file and generate output without displaying UI (batch processing):
+```bash
+python main.py --source /path/to/input.mp4 --render-video --output /path/to/output.mp4
+```
+
+This batch processing mode is especially useful for:
+- Processing videos on headless servers
+- Generating results for multiple videos without manual intervention
+- Converting surveillance footage to annotated videos with detection results
+
 ### Command Options
 
 - `--source`: Where to get video from (file path, camera URL, or device number)
 - `--no-ui`: Run without showing the video window (good for servers)
 - `--record`: Save the output as a new video file
+- `--output`: Specify the path where the output video will be saved
+- `--render-video`: Process a video file and generate output without displaying the UI (batch processing mode)
 
 ### Keyboard Controls
 
