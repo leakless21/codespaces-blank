@@ -83,6 +83,14 @@ DB_URL = os.getenv("DB_URL", f"sqlite:///{BASE_DIR}/data/traffic_data.db")
 
 # === Application settings (from YAML with env override capability) ===
 
+# Hardware acceleration settings
+USE_GPU = env_bool("USE_GPU", 
+                  yaml_config['hardware'].get('use_gpu', False))
+HARDWARE_PROVIDER = os.getenv("HARDWARE_PROVIDER", 
+                             yaml_config['hardware'].get('provider', 'auto'))
+HARDWARE_PRECISION = os.getenv("HARDWARE_PRECISION", 
+                              yaml_config['hardware'].get('precision', 'fp32'))
+
 # Detection settings
 DETECTION_CONFIDENCE = env_float("DETECTION_CONFIDENCE", 
                                 yaml_config['detection'].get('confidence', 0.5))

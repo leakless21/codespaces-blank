@@ -166,6 +166,88 @@ The counting line is an invisible line that counts vehicles when they cross it. 
 
 To switch between them, set `USE_RAW_COORDINATES` to `True` or `False` in your configuration.
 
+## Hardware Acceleration
+
+The system supports GPU acceleration to improve performance. By default, GPU acceleration is disabled. You can enable it in the configuration with minimal changes:
+
+### Quick Start with GPU Acceleration
+
+To enable GPU for all components:
+
+1. Edit `config/settings/config.yaml` and set:
+   ```yaml
+   hardware:
+     use_gpu: true   # Master switch for GPU acceleration
+     provider: "auto" # Let the system detect available GPU
+     precision: "fp32" # Use FP32 precision (or "fp16" for more speed but less accuracy)
+   ```
+
+2. Or simply run with environment variable:
+   ```bash
+   USE_GPU=true python main.py --source /path/to/video.mp4
+   ```
+
+### Platform-Specific Options
+
+The system automatically detects and uses the best available GPU acceleration option for your hardware:
+
+#### NVIDIA GPUs
+- Automatically uses CUDA if available
+- For manual configuration, use `provider: "cuda"` or `HARDWARE_PROVIDER=cuda`
+- For TensorRT acceleration, use `provider: "tensorrt"` (requires TensorRT installation)
+
+#### AMD GPUs
+- Automatically uses ROCm if available
+- For manual configuration, use `provider: "rocm"` or `HARDWARE_PROVIDER=rocm`
+
+#### Intel GPUs
+- Automatically uses OpenVINO if available
+- For manual configuration, use `provider: "openvino"` or `HARDWARE_PROVIDER=openvino`
+
+#### Microsoft DirectML (Windows)
+- Automatically uses DirectML if available
+- For manual configuration, use `provider: "directml"` or `HARDWARE_PROVIDER=directml`
+
+### Advanced Configuration
+
+For more detailed GPU configuration, you can adjust these settings:
+
+1. In `config.yaml`:
+   ```yaml
+   hardware:
+     use_gpu: true
+     provider: "cuda"   # Options: "auto", "cuda", "tensorrt", "openvino", "directml", "rocm"
+     precision: "fp16"  # Options: "fp32", "fp16" (fp16 is faster but less accurate)
+   
+   ocr:
+     use_gpu: true     # Separate control for OCR GPU usage
+   ```
+
+2. Or through environment variables:
+   ```bash
+   USE_GPU=true HARDWARE_PROVIDER=cuda HARDWARE_PRECISION=fp16 OCR_GPU=true python main.py
+   ```
+
+### Troubleshooting GPU Acceleration
+
+If you encounter issues with GPU acceleration:
+
+1. Check if your GPU is detected:
+   ```bash
+   python -c "import onnxruntime as ort; print(ort.get_available_providers())"
+   ```
+
+2. Make sure you have the necessary drivers installed:
+   - NVIDIA: CUDA and cuDNN
+   - AMD: ROCm
+   - Intel: OpenVINO toolkit
+   - Windows: DirectML
+
+3. Try running with specific provider:
+   ```bash
+   HARDWARE_PROVIDER=cpu python main.py  # Force CPU for troubleshooting
+   ```
+
 ## System Organization
 
 ```

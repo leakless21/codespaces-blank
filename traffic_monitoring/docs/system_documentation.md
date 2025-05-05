@@ -298,8 +298,18 @@ python main.py --source /path/to/input.mp4 --render-video --output /path/to/outp
 
 1. **Frame Skipping**: Increase `FRAME_SKIP` to process fewer frames
 2. **Resolution Reduction**: Lower `PROCESS_RESOLUTION` for faster processing
-3. **GPU Acceleration**: Enable GPU for ONNX runtime and OCR if hardware supports it
-4. **Confidence Thresholds**: Raise confidence thresholds to reduce false positives
+3. **GPU Acceleration**: Enable GPU acceleration via hardware settings in config.yaml
+   ```yaml
+   hardware:
+     use_gpu: true
+     provider: "auto"  # Automatically detect available acceleration
+   ```
+4. **Precision Reduction**: Use FP16 precision instead of FP32 for faster inference
+   ```yaml
+   hardware:
+     precision: "fp16"  # Faster but slightly less accurate
+   ```
+5. **Confidence Thresholds**: Raise confidence thresholds to reduce false positives
 
 ### 5.2 Resource-Constrained Environments
 
@@ -310,7 +320,11 @@ For edge devices with limited resources:
 3. Increase frame skipping
 4. Reduce processing resolution
 5. Use a lighter tracking algorithm
-6. Consider disabling visualization in headless mode
+6. Consider disabling visualization with `--no-ui` or headless mode with `--render-video`
+7. Select appropriate hardware acceleration for your platform:
+   - NVIDIA Jetson: `provider: "tensorrt"`
+   - Intel NCS2: `provider: "openvino"`
+   - ARM-based devices: Try `provider: "armnn"` if available
 
 ### 5.3 Performance Benchmarks
 

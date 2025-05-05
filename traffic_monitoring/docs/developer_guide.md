@@ -477,6 +477,172 @@ Focus on these areas for the biggest improvements:
    - Simplify the visualization for faster rendering
    - Use headless mode when UI isn't needed
 
+### 7.3 Hardware Acceleration Implementation
+
+The system implements hardware acceleration using ONNX Runtime's provider system. Here's how it works:
+
+#### Provider Selection Logic
+
+```python
+# In ONNXDetector.__init__, we configure hardware acceleration:
+if config.USE_GPU:
+    # Auto-detection of providers
+    if config.HARDWARE_PROVIDER == "auto":
+        available_providers = ort.get_available_providers()
+        
+        # Prioritize providers in this order
+        if 'CUDAExecutionProvider' in available_providers:
+            providers.append('CUDAExecutionProvider')
+        elif 'DmlExecutionProvider' in available_providers:
+            providers.append('DmlExecutionProvider')
+        elif 'ROCMExecutionProvider' in available_providers:
+            providers.append('ROCMExecutionProvider')
+        elif 'OpenVINOExecutionProvider' in available_providers:
+            providers.append('OpenVINOExecutionProvider')
+    else:
+        # Manual provider selection
+        providers.append(f'{config.HARDWARE_PROVIDER.capitalize()}ExecutionProvider')
+        
+    # Always add CPU as fallback
+    providers.append('CPUExecutionProvider')
+```
+
+#### Precision Control
+
+```python
+# FP16 precision for faster inference with CUDA
+if config.HARDWARE_PRECISION == "fp16" and config.HARDWARE_PROVIDER == "cuda":
+    provider_options = [{
+        'device_id': 0,
+        'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
+        'arena_extend_strategy': 'kNextPowerOfTwo',
+        'cudnn_conv_algo_search': 'EXHAUSTIVE',
+        'do_copy_in_default_stream': True
+    }]
+```
+
+#### Error Handling
+
+```python
+# Graceful fallback to CPU if GPU acceleration fails
+try:
+    session = ort.InferenceSession(
+        model_path, 
+        sess_options=session_options,
+        providers=providers,
+        provider_options=provider_options
+    )
+except Exception as e:
+    print(f"Error loading model with hardware acceleration: {e}")
+    print("Falling back to CPU execution")
+    session = ort.InferenceSession(model_path)
+```
+
+#### Adding Support for New Providers
+
+To add support for a new hardware acceleration platform:
+
+1. First check if ONNX Runtime supports it by running:
+   ```python
+   import onnxruntime as ort
+   print(ort.get_all_providers())  # Shows all providers compiled in
+   ```
+
+2. Add the new provider to the auto-detection logic:
+   ```python
+   if 'NewProviderExecutionProvider' in available_providers:
+       providers.append('NewProviderExecutionProvider')
+       provider_options.append({})  # Add specific options if needed
+   ```
+
+3. Add it to the config.yaml documentation:
+   ```yaml
+   hardware:
+     provider: "auto"  # Options: "auto", "cuda", "tensorrt", "openvino", "directml", "rocm", "newprovider"
+   ```
+
+#### Platform-Specific Optimizations
+
+**NVIDIA (CUDA) Specific Settings:**
+```python
+# TensorRT for maximum NVIDIA performance
+if config.HARDWARE_PROVIDER == "tensorrt":
+    provider_options = [{
+        'trt_max_workspace_size': 2 * 1024 * 1024 * 1024,  # 2GB
+        'trt_fp16_enable': config.HARDWARE_PRECISION == "fp16"
+    }]
+```
+
+**Intel (OpenVINO) Specific Settings:**
+```python
+# OpenVINO for Intel CPUs, GPUs, and accelerators
+if config.HARDWARE_PROVIDER == "openvino":
+    provider_options = [{
+        'device_type': 'GPU'  # Can be 'CPU', 'GPU', 'VPU', etc.
+    }]
+```
+
+**AMD (ROCm) Specific Settings:**
+```python
+# ROCm for AMD GPUs
+if config.HARDWARE_PROVIDER == "rocm":
+    provider_options = [{
+        'device_id': 0
+    }]
+```
+
+#### Testing Acceleration Performance
+
+To benchmark different hardware acceleration options:
+
+```python
+def benchmark_providers(model_path, input_size=(1, 3, 640, 640), iterations=100):
+    """Benchmark different ONNX Runtime providers with a model"""
+    providers = ort.get_available_providers()
+    results = {}
+    
+    # Create dummy input
+    dummy_input = np.random.rand(*input_size).astype(np.float32)
+    
+    # Test each provider
+    for provider in providers:
+        try:
+            # Create session with just this provider
+            session = ort.InferenceSession(
+                model_path, 
+                providers=[provider, 'CPUExecutionProvider']
+            )
+            
+            # Get input name
+            input_name = session.get_inputs()[0].name
+            
+            # Warmup
+            for _ in range(5):
+                session.run(None, {input_name: dummy_input})
+            
+            # Benchmark
+            start = time.time()
+            for _ in range(iterations):
+                session.run(None, {input_name: dummy_input})
+            end = time.time()
+            
+            # Calculate performance
+            avg_time = (end - start) / iterations
+            results[provider] = {
+                'avg_time': avg_time,
+                'fps': 1.0 / avg_time
+            }
+            
+            print(f"{provider}: {avg_time:.4f}s per inference, {results[provider]['fps']:.2f} FPS")
+            
+        except Exception as e:
+            print(f"Error testing {provider}: {e}")
+    
+    return results
+```
+
+Add this utility to your project and use it to determine the most effective hardware acceleration for your specific deployment.
+
 ## 8. Deployment Options
 
 ### 8.1 Using Docker

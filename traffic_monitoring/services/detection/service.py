@@ -35,9 +35,79 @@ class ONNXDetector:
         if not Path(self.model_path).exists():
             raise FileNotFoundError(f"Model file not found: {self.model_path}")
         
-        # Load the ONNX model
+        # Configure session options with hardware acceleration settings
+        session_options = ort.SessionOptions()
+        
+        # Set up hardware acceleration based on configuration
+        providers = []
+        provider_options = []
+        
+        if config.USE_GPU:
+            # Set provider based on configuration or auto-detect
+            if config.HARDWARE_PROVIDER == "auto":
+                # Auto-detect available providers
+                available_providers = ort.get_available_providers()
+                print(f"Available ONNX Runtime providers: {available_providers}")
+                
+                # Prioritize providers (CUDA > DirectML > ROCm > OpenVINO > CPU)
+                if 'CUDAExecutionProvider' in available_providers:
+                    providers.append('CUDAExecutionProvider')
+                    provider_options.append({})
+                elif 'DmlExecutionProvider' in available_providers:
+                    providers.append('DmlExecutionProvider')
+                    provider_options.append({})
+                elif 'ROCMExecutionProvider' in available_providers:
+                    providers.append('ROCMExecutionProvider')
+                    provider_options.append({})
+                elif 'OpenVINOExecutionProvider' in available_providers:
+                    providers.append('OpenVINOExecutionProvider')
+                    provider_options.append({})
+            else:
+                # Use specific provider from configuration
+                if config.HARDWARE_PROVIDER == "cuda":
+                    providers.append('CUDAExecutionProvider')
+                    # Configure CUDA options for half precision if requested
+                    if config.HARDWARE_PRECISION == "fp16":
+                        provider_options.append({'device_id': 0, 'gpu_mem_limit': 2 * 1024 * 1024 * 1024, 'arena_extend_strategy': 'kNextPowerOfTwo', 'cudnn_conv_algo_search': 'EXHAUSTIVE', 'do_copy_in_default_stream': True})
+                    else:
+                        provider_options.append({})
+                elif config.HARDWARE_PROVIDER == "tensorrt":
+                    providers.append('TensorrtExecutionProvider')
+                    provider_options.append({})
+                elif config.HARDWARE_PROVIDER == "directml":
+                    providers.append('DmlExecutionProvider')
+                    provider_options.append({})
+                elif config.HARDWARE_PROVIDER == "openvino":
+                    providers.append('OpenVINOExecutionProvider')
+                    provider_options.append({})
+                elif config.HARDWARE_PROVIDER == "rocm":
+                    providers.append('ROCMExecutionProvider')
+                    provider_options.append({})
+        
+        # Always add CPU as fallback
+        providers.append('CPUExecutionProvider')
+        provider_options.append({})
+        
+        # Print selected providers
+        print(f"Using ONNX Runtime providers: {providers}")
+        
+        # Load the ONNX model with configured providers
         print(f"Loading ONNX model from {self.model_path}")
-        self.session = ort.InferenceSession(self.model_path)
+        try:
+            self.session = ort.InferenceSession(
+                self.model_path, 
+                sess_options=session_options,
+                providers=providers,
+                provider_options=provider_options
+            )
+            
+            # Check which provider was actually used
+            used_provider = self.session.get_providers()[0]
+            print(f"Using provider: {used_provider}")
+            
+        except Exception as e:
+            print(f"Error loading model with hardware acceleration, falling back to CPU: {e}")
+            self.session = ort.InferenceSession(self.model_path)
         
         # Get model metadata
         self.input_name = self.session.get_inputs()[0].name

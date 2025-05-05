@@ -1,5 +1,11 @@
 # Traffic Monitoring System Configuration
 
+# Hardware acceleration settings
+hardware:
+  use_gpu: false  # Master switch for GPU acceleration
+  provider: "auto"  # Options: "auto", "cuda", "tensorrt", "openvino", "directml", "rocm"
+  precision: "fp32"  # Options: "fp32", "fp16"
+
 # Detection settings
 detection:
   confidence: 0.25
