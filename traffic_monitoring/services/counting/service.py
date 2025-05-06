@@ -28,8 +28,8 @@ class CountingService:
         """
         self.counting_line = counting_line or config.COUNTING_LINE
         self.use_raw_coordinates = use_raw_coordinates or getattr(config, 'USE_RAW_COORDINATES', False)
-        self.counted_tracks = {}  # {track_id: {'direction': 1, 'timestamp': ts}}
-        self.counts = {'up': 0, 'down': 0, 'total': 0}
+        self.counted_tracks = {}  # {track_id: {'timestamp': ts}}
+        self.counts = {'total': 0}  # Only track total count
         self.reset_time = time.time()
         
         # Initialize MQTT client
@@ -101,32 +101,18 @@ class CountingService:
             
             # Check if line is crossed
             if self._check_line_crossed(line, p1, p2):
-                # Determine direction of crossing
-                direction = self._get_crossing_direction(line, p1, p2)
-                
-                # Update counts
-                if direction > 0:
-                    self.counts['up'] += 1
-                    count_type = 'up'
-                else:
-                    self.counts['down'] += 1
-                    count_type = 'down'
-                
+                # Update total count only
                 self.counts['total'] += 1
                 
                 # Record this track as counted
                 self.counted_tracks[track_id] = {
-                    'direction': direction,
-                    'timestamp': timestamp,
-                    'type': count_type
+                    'timestamp': timestamp
                 }
                 
                 # Record new count event
                 new_counts.append({
                     'track_id': track_id,
-                    'direction': direction,
                     'timestamp': timestamp,
-                    'type': count_type,
                     'location': p2  # Location of crossing
                 })
         
@@ -151,9 +137,7 @@ class CountingService:
                 'new_counts': [
                     {
                         'track_id': c['track_id'],
-                        'direction': c['direction'],
-                        'timestamp': c['timestamp'],
-                        'type': c['type']
+                        'timestamp': c['timestamp']
                     } for c in new_counts
                 ]
             }
@@ -186,33 +170,9 @@ class CountingService:
         # Check if line segments intersect
         return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
     
-    def _get_crossing_direction(self, line, p1, p2):
-        """
-        Determine the direction of crossing
-        
-        Args:
-            line (list): Counting line [[x1, y1], [x2, y2]]
-            p1 (tuple): First point (x, y)
-            p2 (tuple): Second point (x, y)
-            
-        Returns:
-            int: 1 for upward/rightward, -1 for downward/leftward
-        """
-        # Get the vector perpendicular to the counting line
-        line_vec = [line[1][0] - line[0][0], line[1][1] - line[0][1]]
-        perp_vec = [-line_vec[1], line_vec[0]]  # Perpendicular vector
-        
-        # Get the movement vector
-        move_vec = [p2[0] - p1[0], p2[1] - p1[1]]
-        
-        # Calculate dot product to determine direction
-        dot_product = move_vec[0] * perp_vec[0] + move_vec[1] * perp_vec[1]
-        
-        return 1 if dot_product >= 0 else -1
-    
     def reset_counts(self):
         """Reset all counters"""
-        self.counts = {'up': 0, 'down': 0, 'total': 0}
+        self.counts = {'total': 0}  # Only total count
         self.counted_tracks = {}
         self.reset_time = time.time()
         
@@ -282,7 +242,7 @@ if __name__ == "__main__":
                 
                 # Draw counts
                 counts = counting_results['counts']
-                cv2.putText(frame, f"UP: {counts['up']} DOWN: {counts['down']} TOTAL: {counts['total']}",
+                cv2.putText(frame, f"TOTAL: {counts['total']}",
                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 
                 # Draw tracks
@@ -293,10 +253,7 @@ if __name__ == "__main__":
                     # Change color if counted
                     color = (0, 165, 255)  # Orange for normal tracks
                     if track_id in counting_service.counted_tracks:
-                        if counting_service.counted_tracks[track_id]['direction'] > 0:
-                            color = (0, 255, 0)  # Green for up/right
-                        else:
-                            color = (0, 0, 255)  # Red for down/left
+                        color = (0, 255, 0)  # Green for counted tracks
                     
                     # Draw bounding box
                     cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)

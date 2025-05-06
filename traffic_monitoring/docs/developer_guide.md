@@ -84,6 +84,26 @@ The services form a pipeline where:
 - Results are stored in the database
 - The main application coordinates and visualizes everything
 
+### 2.3 Recent Updates to the System
+
+The system has been updated to address several issues:
+
+1. **Fixed Video Resolution and Speed Issues**:
+   - Modified video ingestion to preserve original frame resolution
+   - Updated video writing to match source video FPS
+   - Improved visualization to scale properly with any resolution
+
+2. **Enhanced Visualization**:
+   - Added vehicle bounding boxes with colored indicators
+   - Added unique vehicle ID display
+   - Added timestamp display
+   - Added license plate detection and display
+   - Improved readability of text elements with background blocks
+
+3. **Simplified Counting Logic**:
+   - Removed directional counting (up/down) in favor of total count only
+   - Simplified the counting interface in both code and UI
+
 ## 3. Service Design Guidelines
 
 When working with existing services or creating new ones, follow these patterns to maintain consistency.
@@ -301,6 +321,78 @@ else:
 
 This gives you flexibility to choose the approach that works best for your use case.
 
+### 4.5 Updating the Visual Interface
+
+To modify the visualization elements (bounding boxes, text, etc.), you need to update the `_prepare_visualization` method in `main.py`. The system now handles original resolution rendering with coordinate scaling.
+
+Here's a guide to updating visualization elements:
+
+1. **Access the correct frame**:
+   ```python
+   # Use original frame for visualization if available
+   if 'original_frame' in frame_data:
+       # For high resolution output
+       orig_frame = frame_data['original_frame'].copy()
+       frame = frame_data['frame'].copy()
+       
+       # Calculate scaling factors
+       scale_x = orig_frame.shape[1] / frame.shape[1]
+       scale_y = orig_frame.shape[0] / frame.shape[0]
+       
+       # Function to scale coordinates
+       def scale_coords(coords):
+           if isinstance(coords, tuple) or isinstance(coords, list):
+               if len(coords) == 2:  # Single point (x,y)
+                   return (int(coords[0] * scale_x), int(coords[1] * scale_y))
+               elif len(coords) == 4:  # Box (x1,y1,x2,y2)
+                   return (int(coords[0] * scale_x), int(coords[1] * scale_y), 
+                           int(coords[2] * scale_x), int(coords[3] * scale_y))
+           return coords
+   else:
+       # Fallback to processed frame if original not available
+       frame = frame_data['frame'].copy()
+   ```
+
+2. **Draw object boxes with scaling**:
+   ```python
+   # Example for drawing a box on original resolution
+   x1, y1, x2, y2 = scale_coords(track['box'])
+   cv2.rectangle(orig_frame, (x1, y1), (x2, y2), color, 2)
+   ```
+
+3. **Add text with background for readability**:
+   ```python
+   # Example for adding text with background
+   text = f"ID:{track_id}"
+   text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+   
+   # Draw black background
+   cv2.rectangle(orig_frame, 
+                (x1, y1 - text_size[1] - 5),
+                (x1 + text_size[0] + 5, y1), 
+                (0, 0, 0), -1)
+                
+   # Draw white text
+   cv2.putText(orig_frame, text, (x1 + 2, y1 - 5),
+              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+   ```
+
+4. **Add transparent overlays**:
+   ```python
+   # Create a copy for overlay
+   overlay = orig_frame.copy()
+   
+   # Draw filled rectangle
+   cv2.rectangle(overlay, (10, 10), (300, 70), (0, 0, 0), -1)
+   
+   # Blend with original with 60% transparency
+   cv2.addWeighted(overlay, 0.6, orig_frame, 0.4, 0, orig_frame)
+   
+   # Draw text on top of overlay
+   cv2.putText(orig_frame, f"TOTAL COUNT: {counts['total']}", (20, 50),
+              cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+   ```
+
 ## 5. Working with AI Models
 
 ### 5.1 Understanding the ONNX Format
@@ -317,7 +409,80 @@ When working with ONNX models, remember:
 2. Output format should align with YOLO's detection format
 3. Models need to be trained for the specific objects you want to detect
 
-### 5.2 Creating Your Own Models
+### 5.2 Working with Different YOLO Model Versions
+
+The system supports multiple YOLO model versions (YOLOv5, YOLOv8, YOLO11) through a flexible configuration system.
+
+#### Configuring Model Versions
+
+You can specify which YOLO model version you're using in two ways:
+
+1. **Via YAML configuration**:
+   ```yaml
+   # In config/settings/config.yaml
+   detection:
+     model_versions:
+       vehicle_model: "yolo11"  # Options: "yolov5", "yolov8", "yolo11"
+       plate_model: "yolov8"    # Options: "yolov5", "yolov8", "yolo11"
+   ```
+
+2. **Via environment variables**:
+   ```bash
+   # In .env file or command line
+   VEHICLE_MODEL_VERSION=yolo11
+   PLATE_MODEL_VERSION=yolov8
+   ```
+
+#### How Model Version Selection Works
+
+The detection service passes the model version to the `ONNXDetector` class, which then handles the specific output format processing:
+
+```python
+# In DetectionService.__init__:
+self.vehicle_detector = ONNXDetector(
+    model_path=vehicle_model_path or config.VEHICLE_DETECTION_MODEL,
+    confidence_threshold=config.DETECTION_CONFIDENCE,
+    iou_threshold=config.DETECTION_IOU_THRESHOLD,
+    enabled_classes=config.ENABLED_VEHICLE_CLASSES,
+    model_version=config.VEHICLE_MODEL_VERSION  # Pass model version
+)
+```
+
+#### Adding Support for New YOLO Versions
+
+If you need to add support for a new YOLO version:
+
+1. **Add the version to the configuration options**:
+   ```yaml
+   model_versions:
+     vehicle_model: "yolov9"  # Add new version option
+   ```
+
+2. **Create a dedicated processing method** in `ONNXDetector`:
+   ```python
+   def _process_yolov9_output(self, output, original_width, original_height):
+       """Process YOLOv9 model output format"""
+       # Implement processing logic for the new format
+       # ...
+       return detections
+   ```
+
+3. **Update the model version handling** in `_process_output`:
+   ```python
+   if self.model_version.lower() == 'yolov9':
+       return self._process_yolov9_output(output, original_width, original_height)
+   ```
+
+#### Automatic Format Detection
+
+Even without specifying a model version, the system attempts to auto-detect the format based on output shape and dimensions. However, explicit configuration is recommended for reliability.
+
+When auto-detecting:
+- 3D outputs (shape [1, boxes, features]) are identified as YOLO11-like
+- Outputs with more than 6 features per detection are processed as YOLOv8-like
+- Other formats are processed with a general approach
+
+### 5.3 Creating Your Own Models
 
 To train custom models for different objects:
 
@@ -339,7 +504,7 @@ yolo task=detect mode=train data=path/to/data.yaml model=yolov8n.pt epochs=100
 python utils/model_converter.py --model runs/train/exp/weights/best.pt
 ```
 
-### 5.3 Making Models Run Faster
+### 5.4 Making Models Run Faster
 
 For better performance, especially on less powerful devices:
 
@@ -857,3 +1022,15 @@ Please ensure your code follows our style guidelines and includes appropriate te
 - Reduce resolution or framerate
 - Use hardware acceleration if available
 - Consider lighter models or algorithms
+
+### Visual Output Issues
+- Video appears resized: Check the video ingestion service's process_resolution setting
+- Speed issues: Ensure output_fps matches the source video's FPS
+- Visualization scaling: Make sure the coordinate scaling is correct when rendering
+- Missing elements: Verify all visual elements are being added in _prepare_visualization
+- Text readability: Add contrasting backgrounds to text elements for better visibility
+
+### Counting Issues
+- Vehicle not counted: Check the counting line placement and detection confidence
+- Multiple counts: Ensure each tracked object is only counted once by checking the counted_tracks
+- Incorrect counts: Reset the counter with the 'r' key or modify the counting logic as needed

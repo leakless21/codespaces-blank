@@ -75,7 +75,7 @@ frame_data = video_service.get_frame()
 
 **Key Features**:
 - ONNX runtime for optimized inference on various hardware
-- Support for YOLO models converted to ONNX format
+- Support for multiple YOLO model versions (YOLOv5, YOLOv8, YOLO11)
 - Two-stage detection: vehicles first, then license plates
 - Non-maximum suppression for duplicate removal
 - Configurable confidence and IoU thresholds
@@ -83,6 +83,8 @@ frame_data = video_service.get_frame()
 **Configuration Parameters**:
 - `VEHICLE_DETECTION_MODEL`: Path to vehicle detection ONNX model
 - `PLATE_DETECTION_MODEL`: Path to license plate detection ONNX model
+- `VEHICLE_MODEL_VERSION`: Version of the vehicle detection model (yolov5, yolov8, yolo11)
+- `PLATE_MODEL_VERSION`: Version of the plate detection model (yolov5, yolov8, yolo11)
 - `DETECTION_CONFIDENCE`: Confidence threshold for detections
 - `DETECTION_IOU_THRESHOLD`: IoU threshold for non-maximum suppression
 
@@ -94,6 +96,7 @@ detection_results = detection_service.detect(frame_data)
 
 **Modification Guide**:
 - To use a different model architecture, modify the `ONNXDetector._process_output()` method
+- To support a new YOLO version, add a specific processing method (e.g., `_process_yolov9_output()`)
 - To add detection of new object types, create additional detector instances
 - To optimize performance, adjust preprocessing in `preprocess()` method
 
@@ -128,7 +131,7 @@ tracking_results = tracking_service.update(frame_data, detection_results)
 
 **Key Features**:
 - Configurable counting line placement with support for both normalized and raw pixel coordinates
-- Directional counting (up/down or left/right)
+- Simple total count tracking
 - Per-track counting to avoid duplicate counts
 - Reset functionality for count statistics
 
@@ -235,6 +238,10 @@ The system uses a `.env` file for configuration, which is loaded via `python-dot
 # Model configurations
 VEHICLE_DETECTION_MODEL=models/vehicle_detection.onnx
 PLATE_DETECTION_MODEL=models/plate_detection.onnx
+
+# Model version settings
+VEHICLE_MODEL_VERSION=yolo11  # Options: yolov5, yolov8, yolo11
+PLATE_MODEL_VERSION=yolov8    # Options: yolov5, yolov8, yolo11
 
 # Detection settings
 DETECTION_CONFIDENCE=0.25

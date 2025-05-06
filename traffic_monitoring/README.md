@@ -12,6 +12,7 @@ This system can:
 - **Read License Plates**: Automatically identify and record license plate numbers
 - **Track Moving Vehicles**: Follow each vehicle as it moves through the video
 - **Count Traffic**: Count vehicles as they cross a line you define on the screen
+- **Visualize Results**: Display bounding boxes, vehicle IDs, license plates, and timestamp
 - **Store Results**: Save all detection data in a database for later analysis
 - **Easy to Extend**: Built with modular components you can customize
 
@@ -101,13 +102,29 @@ This batch processing mode is especially useful for:
 
 When the system is running:
 - Press `q` to quit the program
-- Press `r` to reset the vehicle counters to zero
+- Press `r` to reset the vehicle counter to zero
+
+## System Visualization Features
+
+The system provides a rich visual interface that displays:
+
+- **Vehicle Bounding Boxes**: Each detected vehicle is surrounded by a colored box
+  - Orange boxes: Vehicles that haven't crossed the counting line
+  - Green boxes: Vehicles that have been counted (crossed the line)
+- **Vehicle ID**: Each vehicle gets a unique tracking ID
+- **License Plates**: When detected, license plate text is displayed
+- **Counting Line**: A red line that counts vehicles when they cross it
+- **Total Count**: Prominent display showing total vehicles counted
+- **Timestamp**: Current date and time displayed on the video
+- **FPS Counter**: Shows the processing speed (frames per second)
+
+These visualizations work in both live view mode and in recorded output videos.
 
 ## How It Works
 
 The system uses several components that work together:
 
-1. **Video Ingestion**: Gets frames from your video source
+1. **Video Ingestion**: Gets frames from your video source, preserving original resolution
 2. **Detection**: Uses AI to find vehicles and license plates
 3. **Tracking**: Keeps track of each vehicle as it moves
 4. **Counting**: Counts vehicles when they cross your defined line
@@ -125,6 +142,10 @@ You can easily change how the system works by editing the configuration files. T
 # Model file locations
 VEHICLE_DETECTION_MODEL=models/vehicle_detection.onnx
 PLATE_DETECTION_MODEL=models/plate_detection.onnx
+
+# Model versions - specify which YOLO model format is being used
+VEHICLE_MODEL_VERSION=yolo11  # Options: yolov5, yolov8, yolo11
+PLATE_MODEL_VERSION=yolov8    # Options: yolov5, yolov8, yolo11
 
 # How confident the AI needs to be (0-1)
 DETECTION_CONFIDENCE=0.25

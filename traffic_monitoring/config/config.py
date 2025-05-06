@@ -97,6 +97,12 @@ DETECTION_CONFIDENCE = env_float("DETECTION_CONFIDENCE",
 DETECTION_IOU_THRESHOLD = env_float("DETECTION_IOU_THRESHOLD", 
                                    yaml_config['detection'].get('iou_threshold', 0.45))
 
+# Model version settings
+VEHICLE_MODEL_VERSION = os.getenv("VEHICLE_MODEL_VERSION",
+                                yaml_config['detection']['model_versions'].get('vehicle_model', 'yolov8'))
+PLATE_MODEL_VERSION = os.getenv("PLATE_MODEL_VERSION",
+                              yaml_config['detection']['model_versions'].get('plate_model', 'yolov8'))
+
 # Vehicle class settings
 ENABLED_VEHICLE_CLASSES = env_list("ENABLED_VEHICLE_CLASSES", 
                                   yaml_config['detection']['vehicle_classes']['enabled_classes'])
@@ -108,6 +114,22 @@ TRACKER_TYPE = os.getenv("TRACKER_TYPE",
                         yaml_config['tracking'].get('tracker_type', 'bytetrack'))
 TRACKING_CONFIDENCE = env_float("TRACKING_CONFIDENCE", 
                                yaml_config['tracking'].get('confidence', 0.3))
+
+# ReID model path for trackers that support it
+REID_WEIGHTS_PATH = os.getenv("REID_WEIGHTS_PATH",
+                             os.path.join(str(MODELS_DIR), 
+                                         yaml_config['tracking'].get('reid_weights', 'osnet_x0_25_msmt17.pt')))
+
+# Common tracking parameters
+TRACKER_MAX_AGE = env_int("TRACKER_MAX_AGE",
+                         yaml_config['tracking'].get('max_age', 30))
+TRACKER_MIN_HITS = env_int("TRACKER_MIN_HITS",
+                          yaml_config['tracking'].get('min_hits', 3))
+TRACKER_FRAME_RATE = env_int("TRACKER_FRAME_RATE",
+                            yaml_config['tracking'].get('frame_rate', 30))
+
+# Tracker type-specific configurations (accessible via get_config function)
+# Example: get_config('tracking.bytetrack.track_thresh', 0.6)
 
 # OCR settings
 OCR_LANGUAGES = env_list("OCR_LANGUAGES", 

@@ -16,7 +16,7 @@ class ONNXDetector:
     """
     ONNX-based object detector for vehicles and license plates
     """
-    def __init__(self, model_path=None, confidence_threshold=None, iou_threshold=None, enabled_classes=None):
+    def __init__(self, model_path=None, confidence_threshold=None, iou_threshold=None, enabled_classes=None, model_version=None):
         """
         Initialize the ONNX detector
         
@@ -25,11 +25,13 @@ class ONNXDetector:
             confidence_threshold (float): Confidence threshold for detections
             iou_threshold (float): IoU threshold for non-maximum suppression
             enabled_classes (list): List of class IDs to detect, None for all classes
+            model_version (str): YOLO model version ("yolov5", "yolov8", "yolo11")
         """
         self.model_path = model_path or config.VEHICLE_DETECTION_MODEL
         self.confidence_threshold = confidence_threshold or config.DETECTION_CONFIDENCE
         self.iou_threshold = iou_threshold or config.DETECTION_IOU_THRESHOLD
         self.enabled_classes = enabled_classes
+        self.model_version = model_version  # Store model version for processing
         
         # Check if model file exists
         if not Path(self.model_path).exists():
@@ -181,8 +183,58 @@ class ONNXDetector:
         Returns:
             list: List of detections [x1, y1, x2, y2, confidence, class_id]
         """
+        # Process based on model version if specified
+        if self.model_version:
+            # Handle model-specific output format based on version
+            if self.model_version.lower() == 'yolo11':
+                return self._process_yolo11_output(output, original_width, original_height)
+            elif self.model_version.lower() == 'yolov8':
+                return self._process_yolov8_output(output, original_width, original_height)
+            elif self.model_version.lower() == 'yolov5':
+                return self._process_yolov5_output(output, original_width, original_height)
+        
+        # Auto-detect model format based on output shape
+        if output.ndim == 3:  # YOLO11 format (1, num_boxes, 85)
+            # Flatten first dimension for YOLO11 output
+            output = output.reshape(-1, output.shape[-1])
+            
         # Filter by confidence
-        valid_detections = output[output[:, 4] > self.confidence_threshold]
+        try:
+            valid_detections = output[output[:, 4] > self.confidence_threshold]
+        except IndexError:
+            # If we get an index error, try the YOLO11 specific format
+            # Check output shape to understand model format
+            print(f"Model output shape: {output.shape}")
+            
+            # For YOLO11, reformat the output
+            num_classes = output.shape[1] - 5  # Subtracting x,y,w,h,conf
+            try:
+                # Extract boxes, objectness scores, and classification scores
+                boxes = output[:, :4]  # x, y, w, h
+                objectness = output[:, 4]  # objectness score
+                class_scores = output[:, 5:]  # classification scores
+                
+                # Filter by objectness score
+                mask = objectness > self.confidence_threshold
+                filtered_boxes = boxes[mask]
+                filtered_scores = class_scores[mask]
+                
+                if len(filtered_boxes) == 0:
+                    return []
+                
+                # Get class with highest score and its confidence
+                class_ids = np.argmax(filtered_scores, axis=1)
+                confidences = filtered_scores[np.arange(len(filtered_scores)), class_ids]
+                
+                # Create final detections format
+                valid_detections = np.column_stack((
+                    filtered_boxes,  # x, y, w, h
+                    objectness[mask],  # objectness score
+                    class_ids  # class id
+                ))
+            except Exception as e:
+                print(f"Error processing YOLO output: {e}")
+                return []
         
         if len(valid_detections) == 0:
             return []
@@ -194,15 +246,232 @@ class ONNXDetector:
         
         for detection in valid_detections:
             # Get confidence and class id
-            scores = detection[5:]
-            class_id = np.argmax(scores)
-            confidence = scores[class_id] * detection[4]  # obj_conf * cls_conf
+            if detection.shape[0] > 6:  # YOLOv8 format with class scores
+                # YOLOv8 output format
+                scores = detection[5:]
+                class_id = np.argmax(scores)
+                confidence = scores[class_id] * detection[4]  # obj_conf * cls_conf
+            else:  # YOLO11 or simple format
+                # Already processed above for YOLO11
+                confidence = detection[4]
+                class_id = int(detection[5])
             
             if confidence > self.confidence_threshold:
                 if self.enabled_classes and class_id not in self.enabled_classes:
                     continue
                 
                 # Get bounding box coordinates
+                x, y, w, h = detection[0:4]
+                
+                # Convert to corner format (x1, y1, x2, y2)
+                x1 = int((x - w/2) * original_width)
+                y1 = int((y - h/2) * original_height)
+                x2 = int((x + w/2) * original_width)
+                y2 = int((y + h/2) * original_height)
+                
+                # Ensure box is within image bounds
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(original_width, x2)
+                y2 = min(original_height, y2)
+                
+                boxes.append([x1, y1, x2, y2])
+                confidences.append(float(confidence))
+                class_ids.append(int(class_id))
+        
+        # Apply non-maximum suppression
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, self.confidence_threshold, self.iou_threshold)
+        
+        detections = []
+        for i in indices:
+            # OpenCV 4.x has different output format for NMSBoxes
+            if isinstance(i, (list, tuple)):
+                i = i[0]
+            
+            box = boxes[i]
+            detections.append(box + [confidences[i], class_ids[i]])
+        
+        return detections
+
+    def _process_yolov8_output(self, output, original_width, original_height):
+        """Process YOLOv8 model output format"""
+        # YOLOv8 has a different output format than v5 and v11
+        if output.ndim == 3:
+            output = output.squeeze(0)  # Remove batch dimension
+            
+        # Filter by confidence
+        valid_detections = output[output[:, 4] > self.confidence_threshold]
+        
+        if len(valid_detections) == 0:
+            return []
+        
+        # YOLOv8 outputs format: [x, y, w, h, conf, cls1, cls2, ...]
+        boxes = []
+        confidences = []
+        class_ids = []
+        
+        for detection in valid_detections:
+            # Get class predictions (starting at index 5)
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id] * detection[4]  # class_conf * obj_conf
+            
+            if confidence > self.confidence_threshold:
+                if self.enabled_classes and class_id not in self.enabled_classes:
+                    continue
+                
+                # Get bounding box coordinates (center_x, center_y, width, height)
+                x, y, w, h = detection[0:4]
+                
+                # Convert to corner format (x1, y1, x2, y2)
+                x1 = int((x - w/2) * original_width)
+                y1 = int((y - h/2) * original_height)
+                x2 = int((x + w/2) * original_width)
+                y2 = int((y + h/2) * original_height)
+                
+                # Ensure box is within image bounds
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(original_width, x2)
+                y2 = min(original_height, y2)
+                
+                boxes.append([x1, y1, x2, y2])
+                confidences.append(float(confidence))
+                class_ids.append(int(class_id))
+        
+        # Apply non-maximum suppression
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, self.confidence_threshold, self.iou_threshold)
+        
+        detections = []
+        for i in indices:
+            # OpenCV 4.x has different output format for NMSBoxes
+            if isinstance(i, (list, tuple)):
+                i = i[0]
+            
+            box = boxes[i]
+            detections.append(box + [confidences[i], class_ids[i]])
+        
+        return detections
+    
+    def _process_yolo11_output(self, output, original_width, original_height):
+        """Process YOLO11 model output format"""
+        # YOLO11 format is typically (1, num_boxes, 85)
+        if output.ndim == 3:
+            output = output.reshape(-1, output.shape[-1])
+        
+        # Extract boxes, objectness scores, and classification scores
+        boxes = output[:, :4]  # x, y, w, h
+        objectness = output[:, 4]  # objectness score
+        class_scores = output[:, 5:]  # classification scores
+        
+        # Filter by objectness score
+        mask = objectness > self.confidence_threshold
+        filtered_boxes = boxes[mask]
+        filtered_scores = class_scores[mask]
+        filtered_objectness = objectness[mask]
+        
+        if len(filtered_boxes) == 0:
+            return []
+        
+        # Get class with highest score and its confidence
+        class_ids = np.argmax(filtered_scores, axis=1)
+        class_confidences = filtered_scores[np.arange(len(filtered_scores)), class_ids]
+        confidences = filtered_objectness * class_confidences  # In YOLO11, confidence is obj_conf * cls_conf
+        
+        # Process detections - convert to corner format and apply class filtering
+        boxes = []
+        final_confidences = []
+        final_class_ids = []
+        
+        for i in range(len(filtered_boxes)):
+            class_id = class_ids[i]
+            
+            if self.enabled_classes and class_id not in self.enabled_classes:
+                continue
+                
+            confidence = confidences[i]
+            if confidence < self.confidence_threshold:
+                continue
+                
+            # Get box coordinates
+            x, y, w, h = filtered_boxes[i]
+            
+            # Convert to corner format (x1, y1, x2, y2)
+            x1 = int((x - w/2) * original_width)
+            y1 = int((y - h/2) * original_height)
+            x2 = int((x + w/2) * original_width)
+            y2 = int((y + h/2) * original_height)
+            
+            # Ensure box is within image bounds
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(original_width, x2)
+            y2 = min(original_height, y2)
+            
+            boxes.append([x1, y1, x2, y2])
+            final_confidences.append(float(confidence))
+            final_class_ids.append(int(class_id))
+        
+        # Apply non-maximum suppression
+        indices = cv2.dnn.NMSBoxes(boxes, final_confidences, self.confidence_threshold, self.iou_threshold)
+        
+        detections = []
+        for i in indices:
+            # OpenCV 4.x has different output format for NMSBoxes
+            if isinstance(i, (list, tuple)):
+                i = i[0]
+            
+            box = boxes[i]
+            detections.append(box + [final_confidences[i], final_class_ids[i]])
+        
+        return detections
+    
+    def _process_yolov5_output(self, output, original_width, original_height):
+        """Process YOLOv5 model output format"""
+        # YOLOv5 format is similar to YOLO11 but with some differences
+        if output.ndim == 3:
+            output = output.squeeze(0)  # Remove batch dimension
+        
+        # YOLOv5 outputs format: [x, y, w, h, conf, cls1, cls2, ...]
+        # YOLOv5 older versions: [x, y, w, h, cls1, cls2, ..., conf]
+        # We need to detect the format
+        
+        # Check if confidence is at index 4 (newer format) or last column (older format)
+        if output.shape[1] > 6:
+            # Newer YOLOv5 format (similar to YOLOv8)
+            valid_detections = output[output[:, 4] > self.confidence_threshold]
+            conf_idx = 4
+            cls_start_idx = 5
+        else:
+            # Older YOLOv5 format
+            valid_detections = output[output[:, -1] > self.confidence_threshold]
+            conf_idx = -1
+            cls_start_idx = 5
+        
+        if len(valid_detections) == 0:
+            return []
+        
+        boxes = []
+        confidences = []
+        class_ids = []
+        
+        for detection in valid_detections:
+            # Determine format and extract confidence and class
+            if conf_idx == 4:
+                # Newer format
+                scores = detection[cls_start_idx:]
+                class_id = np.argmax(scores)
+                confidence = detection[conf_idx]
+            else:
+                # Older format
+                class_id = np.argmax(detection[5:-1])
+                confidence = detection[conf_idx]
+            
+            if confidence > self.confidence_threshold:
+                if self.enabled_classes and class_id not in self.enabled_classes:
+                    continue
+                
+                # Get bounding box coordinates (center_x, center_y, width, height)
                 x, y, w, h = detection[0:4]
                 
                 # Convert to corner format (x1, y1, x2, y2)
@@ -253,14 +522,16 @@ class DetectionService:
             model_path=vehicle_model_path or config.VEHICLE_DETECTION_MODEL,
             confidence_threshold=config.DETECTION_CONFIDENCE,
             iou_threshold=config.DETECTION_IOU_THRESHOLD,
-            enabled_classes=config.ENABLED_VEHICLE_CLASSES
+            enabled_classes=config.ENABLED_VEHICLE_CLASSES,
+            model_version=config.VEHICLE_MODEL_VERSION
         )
         
         # Initialize plate detector
         self.plate_detector = ONNXDetector(
             model_path=plate_model_path or config.PLATE_DETECTION_MODEL,
             confidence_threshold=config.DETECTION_CONFIDENCE,
-            iou_threshold=config.DETECTION_IOU_THRESHOLD
+            iou_threshold=config.DETECTION_IOU_THRESHOLD,
+            model_version=config.PLATE_MODEL_VERSION
         )
         
         # Store class names for visualization

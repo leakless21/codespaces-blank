@@ -36,6 +36,9 @@ class VideoIngestionService:
         self.frame_count = 0
         self.last_position = 0  # Track the last frame position
         
+        # Added a lock for thread safety when accessing the video capture object
+        self.capture_lock = threading.Lock()
+        
         # Initialize MQTT client
         self.client = mqtt.Client()
         self.mqtt_topic = f"{config.MQTT_TOPIC_PREFIX}/frames"
@@ -107,9 +110,10 @@ class VideoIngestionService:
         """
         if self.capture is None:
             return 0
-            
+        
         # This only works for video files, not for cameras/streams
-        total = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        with self.capture_lock:
+            total = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
         
         # Return 0 for live sources (webcams, RTSP streams)
         if total <= 0 or isinstance(self.source, int) or (
@@ -136,18 +140,69 @@ class VideoIngestionService:
             
         # Only attempt to rewind for file sources, not cameras
         if isinstance(self.source, str) and Path(self.source).exists():
-            current_pos = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
-            
-            # Store for rewind if this is first frame
-            if current_pos <= 1:
-                self.last_position = 0
-            else:
-                self.last_position = current_pos - 1
+            with self.capture_lock:
+                current_pos = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
                 
-            self.capture.set(cv2.CAP_PROP_POS_FRAMES, self.last_position)
+                # Store for rewind if this is first frame
+                if current_pos <= 1:
+                    self.last_position = 0
+                else:
+                    self.last_position = current_pos - 1
+                    
+                self.capture.set(cv2.CAP_PROP_POS_FRAMES, self.last_position)
             return True
         
         return False
+
+    def get_fps(self):
+        """
+        Get the FPS (frames per second) of the video source
+        
+        Returns:
+            float: FPS of the video source or the default output FPS if unavailable
+        """
+        if hasattr(self, 'fps') and self.fps > 0:
+            return self.fps
+        return config.OUTPUT_FPS  # Fallback to config value
+
+    def estimate_total_frames(self):
+        """
+        Estimate the total number of frames in the video source more accurately
+        than the potentially unreliable CAP_PROP_FRAME_COUNT.
+        
+        This is more accurate but slower than get_total_frames() as it uses
+        the video duration and FPS to calculate the frame count.
+        
+        Returns:
+            int: Estimated total frames or 0 if unavailable
+        """
+        if self.capture is None or not isinstance(self.source, str) or not Path(self.source).exists():
+            return 0
+            
+        try:
+            with self.capture_lock:
+                # Get video duration in seconds
+                duration = self.capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                current_pos = self.capture.get(cv2.CAP_PROP_POS_FRAMES)
+                
+                if duration <= 0:
+                    # Try to get duration by seeking to the end
+                    self.capture.set(cv2.CAP_PROP_POS_AVI_RATIO, 1.0)  # Seek to end (1.0 = 100%)
+                    duration = self.capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                    # Restore position
+                    self.capture.set(cv2.CAP_PROP_POS_FRAMES, current_pos)
+                
+                # Get FPS
+                fps = self.get_fps()
+                
+                if duration > 0 and fps > 0:
+                    return int(duration * fps)
+                    
+                # Fallback to reported count
+                return self.get_total_frames()
+        except Exception as e:
+            print(f"Error estimating frame count: {e}")
+            return self.get_total_frames()
 
     def _capture_frames(self):
         """Thread function for capturing frames"""
@@ -156,11 +211,13 @@ class VideoIngestionService:
             if isinstance(self.source, str) and Path(self.source).exists():
                 self.last_position = int(self.capture.get(cv2.CAP_PROP_POS_FRAMES))
                 
-            ret, frame = self.capture.read()
+            with self.capture_lock:
+                ret, frame = self.capture.read()
             if not ret:
                 # If video file ends, loop back to beginning
                 if isinstance(self.source, str) and Path(self.source).exists():
-                    self.capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    with self.capture_lock:
+                        self.capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
                 else:
                     print("Failed to capture frame, stopping")
@@ -173,9 +230,14 @@ class VideoIngestionService:
             if self.frame_count % self.frame_skip != 0:
                 continue
             
+            # Store original frame for recording
+            original_frame = frame.copy()
+            
             # Resize frame to processing resolution
             if self.process_resolution:
-                frame = cv2.resize(frame, self.process_resolution)
+                processed_frame = cv2.resize(frame, self.process_resolution)
+            else:
+                processed_frame = frame
             
             # Add frame to queue, drop oldest if full
             if self.frames_queue.full():
@@ -186,7 +248,8 @@ class VideoIngestionService:
             
             timestamp = time.time()
             self.frames_queue.put({
-                'frame': frame,
+                'frame': processed_frame,
+                'original_frame': original_frame,  # Store original frame
                 'timestamp': timestamp,
                 'frame_id': self.frame_count
             })
@@ -198,8 +261,10 @@ class VideoIngestionService:
                 msg = {
                     'timestamp': timestamp,
                     'frame_id': self.frame_count,
-                    'height': frame.shape[0],
-                    'width': frame.shape[1]
+                    'height': processed_frame.shape[0],
+                    'width': processed_frame.shape[1],
+                    'original_height': original_frame.shape[0],
+                    'original_width': original_frame.shape[1]
                 }
                 self.client.publish(self.mqtt_topic, json.dumps(msg))
     
@@ -240,4 +305,4 @@ if __name__ == "__main__":
         print("Interrupted")
     finally:
         service.stop()
-        cv2.destroyAllWindows()
+        cv2.destroyAll
