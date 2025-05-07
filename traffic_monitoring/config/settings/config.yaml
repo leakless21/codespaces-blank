@@ -100,7 +100,11 @@ ocr:
 
 # Counting settings
 counting:
+  # Whether to use raw pixel coordinates instead of normalized coordinates
+  use_raw_coordinates: true  # Set to true by default for more intuitive setup
+  
   # Counting line coordinates
+  # IMPORTANT: This should be customized for each video to match the specific road position
   # If use_raw_coordinates is false, values should be between 0-1 (normalized)
   # If use_raw_coordinates is true, values should be pixel coordinates
   raw_coordinates:

@@ -160,16 +160,16 @@ OCR_LANGUAGES=en
 OCR_GPU=False
 
 # Vehicle counting settings
-USE_RAW_COORDINATES=False
+USE_RAW_COORDINATES=True  # Use raw pixel coordinates by default
+
+# For counting line using exact pixel positions (default):
+COUNTING_LINE_START=320,360
+COUNTING_LINE_END=960,360
 
 # For counting line using relative coordinates (0-1):
-COUNTING_LINE_START=0.25,0.6
-COUNTING_LINE_END=0.75,0.6
-
-# For counting line using exact pixel positions:
-# USE_RAW_COORDINATES=True
-# COUNTING_LINE_START=320,360
-# COUNTING_LINE_END=960,360
+# USE_RAW_COORDINATES=False
+# COUNTING_LINE_START=0.25,0.6
+# COUNTING_LINE_END=0.75,0.6
 
 # Video processing settings
 VIDEO_SOURCE=0  # 0 means first webcam
@@ -181,9 +181,9 @@ PROCESS_RESOLUTION=640,480  # Width,height to resize video for processing
 
 The counting line is an invisible line that counts vehicles when they cross it. You can define it in two ways:
 
-1. **Normalized Coordinates** (default): Values from 0-1 representing percentages of the screen width/height. Works with any video size.
+1. **Pixel Coordinates** (default): Exact pixel positions on the screen. More precise and intuitive to work with when setting up a line on a specific video.
    
-2. **Pixel Coordinates**: Exact pixel positions on the screen. More precise but depends on video resolution.
+2. **Normalized Coordinates**: Values from 0-1 representing percentages of the screen width/height. Works with any video size but less intuitive to set up.
 
 To switch between them, set `USE_RAW_COORDINATES` to `True` or `False` in your configuration.
 

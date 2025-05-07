@@ -256,13 +256,13 @@ OCR_LANGUAGES=en
 OCR_GPU=False
 
 # Counting settings
-USE_RAW_COORDINATES=False
+USE_RAW_COORDINATES=True  # Default is now raw pixel coordinates
+# For raw pixel coordinates (USE_RAW_COORDINATES=True, recommended):
+COUNTING_LINE_START=320,360
+COUNTING_LINE_END=960,360
 # For normalized coordinates (USE_RAW_COORDINATES=False):
-COUNTING_LINE_START=0.25,0.6
-COUNTING_LINE_END=0.75,0.6
-# For raw pixel coordinates (USE_RAW_COORDINATES=True):
-# COUNTING_LINE_START=320,360
-# COUNTING_LINE_END=960,360
+# COUNTING_LINE_START=0.25,0.6
+# COUNTING_LINE_END=0.75,0.6
 
 # Video settings
 VIDEO_SOURCE=0

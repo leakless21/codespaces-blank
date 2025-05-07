@@ -151,16 +151,23 @@ MQTT_TOPIC_PREFIX = os.getenv("MQTT_TOPIC_PREFIX",
                              yaml_config['mqtt'].get('topic_prefix', 'traffic'))
 
 # Counting line settings
-if USE_RAW_COORDINATES:
-    COUNTING_LINE = [
-        yaml_config['counting']['raw_coordinates'].get('start', [0, 400]),
-        yaml_config['counting']['raw_coordinates'].get('end', [800, 400])
-    ]
-else:
-    COUNTING_LINE = [
-        yaml_config['counting']['normalized_coordinates'].get('start', [0.0, 0.5]),
-        yaml_config['counting']['normalized_coordinates'].get('end', [1.0, 0.5])
-    ]
+# Load use_raw_coordinates from YAML if present, otherwise from env var
+USE_RAW_COORDINATES = env_bool("USE_RAW_COORDINATES", 
+                              yaml_config['counting'].get('use_raw_coordinates', False))
+
+# Store both raw and normalized coordinates for flexibility
+RAW_COUNTING_LINE = [
+    yaml_config['counting']['raw_coordinates'].get('start', [0, 400]),
+    yaml_config['counting']['raw_coordinates'].get('end', [800, 400])
+]
+
+NORMALIZED_COUNTING_LINE = [
+    yaml_config['counting']['normalized_coordinates'].get('start', [0.25, 0.5]),
+    yaml_config['counting']['normalized_coordinates'].get('end', [0.75, 0.5])
+]
+
+# Set the primary counting line based on the use_raw_coordinates flag
+COUNTING_LINE = RAW_COUNTING_LINE if USE_RAW_COORDINATES else NORMALIZED_COUNTING_LINE
 
 def get_config(path: str, default: Any = None) -> Any:
     """

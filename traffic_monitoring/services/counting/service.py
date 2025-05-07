@@ -16,7 +16,7 @@ class CountingService:
     """
     Service for counting vehicles crossing a line
     """
-    def __init__(self, counting_line=None, use_raw_coordinates=False):
+    def __init__(self, counting_line=None, use_raw_coordinates=None):
         """
         Initialize the counting service
         
@@ -24,10 +24,35 @@ class CountingService:
             counting_line (list): List of two points defining the counting line
                 [[x1, y1], [x2, y2]] in normalized coordinates (0-1) or raw pixel coordinates
             use_raw_coordinates (bool): If True, counting_line contains raw pixel coordinates
-                instead of normalized coordinates
+                instead of normalized coordinates. If None, uses config.USE_RAW_COORDINATES.
         """
-        self.counting_line = counting_line or config.COUNTING_LINE
-        self.use_raw_coordinates = use_raw_coordinates or getattr(config, 'USE_RAW_COORDINATES', False)
+        # Get configuration
+        self.use_raw_coordinates = use_raw_coordinates if use_raw_coordinates is not None else getattr(config, 'USE_RAW_COORDINATES', False)
+        
+        # Get counting line from parameters or configuration
+        if counting_line is not None:
+            self.counting_line = counting_line
+        else:
+            # Try to get appropriate counting line from config
+            if self.use_raw_coordinates and hasattr(config, 'RAW_COUNTING_LINE'):
+                self.counting_line = config.RAW_COUNTING_LINE
+            elif hasattr(config, 'COUNTING_LINE'):
+                self.counting_line = config.COUNTING_LINE
+            else:
+                # Fallback to default (horizontal line in the middle)
+                print("Warning: No counting line configured. Using default (horizontal line in the middle).")
+                self.counting_line = [[0.25, 0.5], [0.75, 0.5]]
+                self.use_raw_coordinates = False
+        
+        # Validate counting line format
+        if not (isinstance(self.counting_line, list) and 
+                len(self.counting_line) == 2 and 
+                all(isinstance(p, list) and len(p) == 2 for p in self.counting_line)):
+            print(f"Invalid counting line format: {self.counting_line}. Using default.")
+            self.counting_line = [[0.25, 0.5], [0.75, 0.5]]
+            self.use_raw_coordinates = False
+            
+        # Initialize counters
         self.counted_tracks = {}  # {track_id: {'timestamp': ts}}
         self.counts = {'total': 0}  # Only track total count
         self.reset_time = time.time()
@@ -45,6 +70,12 @@ class CountingService:
             print(f"Failed to connect to MQTT broker: {e}")
             print("Running in offline mode")
             self.client = None
+            
+        # Log counting line setup
+        if self.use_raw_coordinates:
+            print(f"Using raw pixel coordinates for counting line: {self.counting_line}")
+        else:
+            print(f"Using normalized coordinates for counting line: {self.counting_line}")
     
     def update(self, frame_data, tracking_results):
         """

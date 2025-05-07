@@ -265,26 +265,9 @@ When adding new functionality:
 
 The system offers two ways to specify the counting line:
 
-#### Normalized Coordinates (Default)
+#### Raw Pixel Coordinates (Default)
 
-This method uses values between 0 and 1, representing the percentage of the screen's width and height. The advantage is that it works with any video resolution.
-
-```python
-# In .env file or YAML config:
-USE_RAW_COORDINATES=False
-COUNTING_LINE_START=0.25,0.6  # 25% from left, 60% from top
-COUNTING_LINE_END=0.75,0.6    # 75% from left, 60% from top
-
-# In code:
-counting_service = CountingService(
-    counting_line=[[0.25, 0.6], [0.75, 0.6]], 
-    use_raw_coordinates=False
-)
-```
-
-#### Raw Pixel Coordinates
-
-This method uses exact pixel positions on the screen. This gives more precise control but depends on the video's resolution.
+This method uses exact pixel positions on the screen. This gives more precise control and is more intuitive when setting up counting lines for specific videos.
 
 ```python
 # In .env file or YAML config:
@@ -296,6 +279,23 @@ COUNTING_LINE_END=960,360    # X=960, Y=360 pixels
 counting_service = CountingService(
     counting_line=[[320, 360], [960, 360]], 
     use_raw_coordinates=True
+)
+```
+
+#### Normalized Coordinates
+
+This alternative method uses values between 0 and 1, representing the percentage of the screen's width and height. The advantage is that it works with any video resolution, but it can be less intuitive to set up.
+
+```python
+# In .env file or YAML config:
+USE_RAW_COORDINATES=False
+COUNTING_LINE_START=0.25,0.6  # 25% from left, 60% from top
+COUNTING_LINE_END=0.75,0.6    # 75% from left, 60% from top
+
+# In code:
+counting_service = CountingService(
+    counting_line=[[0.25, 0.6], [0.75, 0.6]], 
+    use_raw_coordinates=False
 )
 ```
 
