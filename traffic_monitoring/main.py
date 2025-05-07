@@ -6,6 +6,7 @@ import argparse
 import threading
 import queue
 from pathlib import Path
+import logging
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -18,6 +19,14 @@ from services.counting.service import CountingService
 from services.ocr.service import OCRService
 from services.storage.service import StorageService
 from config import config
+from utils.mqtt_broker import MQTTBroker
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class TrafficMonitoringApp:
     """
@@ -40,6 +49,10 @@ class TrafficMonitoringApp:
         self.output_path = output_path
         self.render_video_only = render_video_only
         self.running = False
+        self.mqtt_broker = None
+        
+        # Start MQTT broker if needed
+        self._start_mqtt_broker()
         
         # Initialize services
         print("Initializing services...")
@@ -61,6 +74,35 @@ class TrafficMonitoringApp:
         self.video_writer_running = False
         
         print("Services initialized")
+    
+    def _start_mqtt_broker(self):
+        """Start an MQTT broker if needed"""
+        # Check if MQTT is enabled in config
+        mqtt_enabled = getattr(config, 'MQTT_ENABLED', True)  # Default to True
+        if not mqtt_enabled:
+            logger.info("MQTT is disabled in configuration, skipping broker initialization")
+            return
+            
+        host = config.MQTT_BROKER
+        port = config.MQTT_PORT
+        
+        # Only start broker if we're using localhost (not external broker)
+        if host.lower() in ['localhost', '127.0.0.1']:
+            try:
+                logger.info(f"Ensuring MQTT broker is available at {host}:{port}")
+                self.mqtt_broker = MQTTBroker(host=host, port=port)
+                if self.mqtt_broker.start():
+                    if self.mqtt_broker.is_embedded:
+                        logger.info("Started embedded MQTT broker")
+                    else:
+                        logger.info("Using existing MQTT broker")
+                else:
+                    logger.warning("Failed to start MQTT broker, services will run in offline mode")
+            except Exception as e:
+                logger.error(f"Error starting MQTT broker: {e}")
+                logger.warning("Services will run in offline mode")
+        else:
+            logger.info(f"Using external MQTT broker at {host}:{port}")
     
     def start(self):
         """Start the traffic monitoring application"""
@@ -132,6 +174,14 @@ class TrafficMonitoringApp:
         
         # Close all OpenCV windows
         cv2.destroyAllWindows()
+        
+        # Stop MQTT broker if we started it
+        if self.mqtt_broker is not None:
+            try:
+                self.mqtt_broker.stop()
+                logger.info("MQTT broker stopped")
+            except Exception as e:
+                logger.error(f"Error stopping MQTT broker: {e}")
         
         print("Traffic monitoring application stopped")
     

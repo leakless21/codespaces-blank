@@ -69,6 +69,7 @@ VIDEO_SOURCE = os.getenv("VIDEO_SOURCE", "0")  # 0 for webcam, or file path/RTSP
 USE_RAW_COORDINATES = env_bool("USE_RAW_COORDINATES", False)
 
 # MQTT connection settings
+MQTT_ENABLED = env_bool("MQTT_ENABLED", yaml_config['mqtt'].get('enabled', True))
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = env_int("MQTT_PORT", 1883)
 MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")  # Optional username
